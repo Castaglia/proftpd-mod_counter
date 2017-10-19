@@ -1,7 +1,6 @@
 /*
  * ProFTPD: mod_counter -- a module for using counters to enforce per-file usage
- *
- * Copyright (c) 2004-2010 TJ Saunders
+ * Copyright (c) 2004-2017 TJ Saunders
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,8 +23,6 @@
  *
  * This is mod_counter, contrib software for proftpd 1.2.10rc1 and above.
  * For more information contact TJ Saunders <tj@castaglia.org>.
- *
- * $Id: mod_counter.c,v 1.6 2010/02/06 02:05:01 tj Exp tj $
  */
 
 #include "conf.h"

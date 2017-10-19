@@ -24,8 +24,8 @@ script:
   - git clone --depth 10 https://github.com/proftpd/proftpd.git
   - cp mod_counter.c proftpd/contrib/
   - cd proftpd
-  - ./configure --enable-devel=coverage --enable-dso --enable-tests --with-shared=mod_counter
+  - ./configure LIBS='-lm -lrt -pthread' --enable-devel=coverage --enable-dso --enable-tests --with-shared=mod_counter
   - make
   - make clean
-  - ./configure --enable-devel=coverage --enable-tests --with-modules=mod_counter
+  - ./configure LIBS='-lm -lrt -pthread' --enable-devel=coverage --enable-tests --with-modules=mod_counter
   - make
