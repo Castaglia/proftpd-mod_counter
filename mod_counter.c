@@ -366,7 +366,6 @@ static int counter_file_write(pr_fh_t *fh, array_header *ids) {
 static pr_fh_t *counter_get_fh(pool *p, const char *path) {
   struct counter_fh *iter, *cfh = NULL;
   const char *abs_path;
-  size_t pathlen;
 
   /* Find the CounterFile handle to use for the given path, if any. */
 
@@ -381,8 +380,6 @@ static pr_fh_t *counter_get_fh(pool *p, const char *path) {
   } else {
     abs_path = path;
   }
-
-  pathlen = strlen(abs_path);
 
   /* In order to handle globs, we do two passes.  On the first pass,
    * we look for the closest-matching glob area.  On the second pass,
@@ -711,7 +708,7 @@ MODRET counter_retr(cmd_rec *cmd) {
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: no CounterFile found for path '%s'", cmd->argv[0],
+      "%s: no CounterFile found for path '%s'", (char *) cmd->argv[0],
       counter_curr_path);
 
     /* No CounterFile configured/available for this path. */
@@ -737,7 +734,7 @@ MODRET counter_retr(cmd_rec *cmd) {
      * The download should be failed.
      */
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: max number of readers (%d) reached for '%s'", cmd->argv[0],
+      "%s: max number of readers (%d) reached for '%s'", (char *) cmd->argv[0],
       counter_max_readers, counter_curr_path);
     pr_response_add_err(R_450, _("%s: File busy"), cmd->arg);
     return PR_ERROR(cmd);
@@ -745,8 +742,8 @@ MODRET counter_retr(cmd_rec *cmd) {
 
   counter_pending |= COUNTER_HAVE_READER;
   (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-    "%s: added reader counter for '%s' (semaphore ID %d)", cmd->argv[0],
-    counter_curr_path, counter_curr_semid);
+    "%s: added reader counter for '%s' (semaphore ID %d)",
+    (char *) cmd->argv[0], counter_curr_path, counter_curr_semid);
 
   return PR_DECLINED(cmd);
 }
@@ -784,7 +781,7 @@ MODRET counter_alter(cmd_rec *cmd) {
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: no CounterFile found for path '%s'", cmd->argv[0],
+      "%s: no CounterFile found for path '%s'", (char *) cmd->argv[0],
       counter_curr_path);
 
     /* No CounterFile configured/available for this path. */
@@ -810,7 +807,7 @@ MODRET counter_alter(cmd_rec *cmd) {
      * The upload should be failed.
      */
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: max number of writers (%d) reached for '%s'", cmd->argv[0],
+      "%s: max number of writers (%d) reached for '%s'", (char *) cmd->argv[0],
       counter_max_writers, counter_curr_path);
     pr_response_add_err(R_450, _("%s: File busy"), cmd->arg);
     return PR_ERROR(cmd);
@@ -818,8 +815,8 @@ MODRET counter_alter(cmd_rec *cmd) {
 
   counter_pending |= COUNTER_HAVE_WRITER;
   (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-    "%s: added writer counter for '%s' (semaphore ID %d)", cmd->argv[0],
-    counter_curr_path, counter_curr_semid);
+    "%s: added writer counter for '%s' (semaphore ID %d)",
+    (char *) cmd->argv[0], counter_curr_path, counter_curr_semid);
 
   return PR_DECLINED(cmd);
 }
@@ -845,7 +842,7 @@ MODRET counter_stor(cmd_rec *cmd) {
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: no CounterFile found for path '%s'", cmd->argv[0],
+      "%s: no CounterFile found for path '%s'", (char *) cmd->argv[0],
       counter_curr_path);
 
     /* No CounterFile configured/available for this path. */
@@ -871,7 +868,7 @@ MODRET counter_stor(cmd_rec *cmd) {
      * The upload should be failed.
      */
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: max number of writers (%d) reached for '%s'", cmd->argv[0],
+      "%s: max number of writers (%d) reached for '%s'", (char *) cmd->argv[0],
       counter_max_writers, counter_curr_path);
     pr_response_add_err(R_450, _("%s: File busy"), cmd->arg);
     return PR_ERROR(cmd);
@@ -879,8 +876,8 @@ MODRET counter_stor(cmd_rec *cmd) {
 
   counter_pending |= COUNTER_HAVE_WRITER;
   (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-    "%s: added writer counter for '%s' (semaphore ID %d)", cmd->argv[0],
-    counter_curr_path, counter_curr_semid);
+    "%s: added writer counter for '%s' (semaphore ID %d)",
+    (char *) cmd->argv[0], counter_curr_path, counter_curr_semid);
 
   return PR_DECLINED(cmd);
 }
@@ -897,7 +894,7 @@ MODRET counter_reader_done(cmd_rec *cmd) {
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: no CounterFile found for path '%s'", cmd->argv[0],
+      "%s: no CounterFile found for path '%s'", (char *) cmd->argv[0],
       counter_curr_path);
 
     /* No CounterFile configured/available for this path. */
@@ -944,7 +941,7 @@ MODRET counter_writer_done(cmd_rec *cmd) {
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "%s: no CounterFile found for path '%s'", cmd->argv[0],
+      "%s: no CounterFile found for path '%s'", (char *) cmd->argv[0],
       counter_curr_path);
 
     /* No CounterFile configured/available for this path. */
