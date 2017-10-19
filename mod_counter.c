@@ -32,7 +32,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-#define MOD_COUNTER_VERSION	"mod_counter/0.5"
+#define MOD_COUNTER_VERSION	"mod_counter/0.6"
 
 #if PROFTPD_VERSION_NUMBER < 0x0001030201
 # error "ProFTPD 1.3.2rc1 or later required"
@@ -616,12 +616,15 @@ MODRET set_counterengine(cmd_rec *cmd) {
 /* usage: CounterFile path */
 MODRET set_counterfile(cmd_rec *cmd) {
   config_rec *c;
+  const char *path;
 
   CHECK_ARGS(cmd, 1);
   CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL|CONF_ANON|CONF_DIR);
 
-  if (*cmd->argv[1] != '/')
+  path = cmd->argv[1];
+  if (*path != '/') {
     CONF_ERROR(cmd, "must be an absolute path");
+  }
 
   /* In theory, we could open a filehandle on the configured path right
    * here, and fail if the file couldn't be created/opened.  Then we
@@ -634,7 +637,7 @@ MODRET set_counterfile(cmd_rec *cmd) {
    * where we know vhost to which the client connected.
    */
 
-  c = add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
+  c = add_config_param_str(cmd->argv[0], 1, path);
   c->flags |= CF_MERGEDOWN;
 
   return PR_HANDLED(cmd);
@@ -645,8 +648,9 @@ MODRET set_counterlog(cmd_rec *cmd) {
   CHECK_ARGS(cmd, 1);
   CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
 
-  if (pr_fs_valid_path(cmd->argv[1]) < 0)
+  if (pr_fs_valid_path(cmd->argv[1]) < 0) {
     CONF_ERROR(cmd, "must be an absolute path");
+  }
 
   add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
   return PR_HANDLED(cmd);
@@ -1079,8 +1083,8 @@ static int counter_sess_init(void) {
    * of a chroot.
    */
   c = find_config(main_server->conf, CONF_PARAM, "CounterFile", TRUE);
-  while (c) {
-    int xerrno;
+  while (c != NULL) {
+    int xerrno = 0;
     const char *area = NULL, *path;
     pr_fh_t *fh;
     struct counter_fh *cfh;
@@ -1111,7 +1115,7 @@ static int counter_sess_init(void) {
 
     PRIVS_ROOT
     fh = pr_fsio_open(path, O_RDWR|O_CREAT);
-    xerrno = xerrno;
+    xerrno = errno;
     PRIVS_RELINQUISH
 
     if (fh == NULL) {
@@ -1122,7 +1126,7 @@ static int counter_sess_init(void) {
       if (counter_fhs != NULL) {
         for (cfh = (struct counter_fh *) counter_fhs->xas_list; cfh;
             cfh = cfh->next) {
-          pr_fsio_close(cfh->fh);
+          (void) pr_fsio_close(cfh->fh);
         }
       }
 
@@ -1167,7 +1171,6 @@ static int counter_sess_init(void) {
   }
 
   pr_event_register(&counter_module, "core.exit", counter_exit_ev, NULL);
-
   return 0;
 }
 
