@@ -1,4 +1,0 @@
-The mod_counter module for ProFTPD provides limits on the number
-of concurrent uploads/downloads for files.
-
-For further module documentation, see mod_counter.html.
