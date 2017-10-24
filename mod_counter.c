@@ -32,7 +32,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-#define MOD_COUNTER_VERSION	"mod_counter/0.6"
+#define MOD_COUNTER_VERSION	"mod_counter/0.6.1"
 
 #if PROFTPD_VERSION_NUMBER < 0x0001030201
 # error "ProFTPD 1.3.2rc1 or later required"
@@ -60,6 +60,7 @@ struct counter_fh {
 static pool *counter_pool = NULL;
 
 static xaset_t *counter_fhs = NULL;
+static const char *counter_chroot_path = NULL;
 static const char *counter_curr_path = NULL;
 static int counter_curr_semid = -1;
 static int counter_engine = FALSE;
@@ -71,7 +72,9 @@ static int counter_pending = 0;
 #define COUNTER_HAVE_READER	0x01
 #define COUNTER_HAVE_WRITER	0x02
 
-#if (defined(__GNU_LIBRARY__) && !defined(_SEM_SEMUN_UNDEFINED)) || defined(DARWIN9)
+#if (defined(__GNU_LIBRARY__) && !defined(_SEM_SEMUN_UNDEFINED)) || \
+    defined(DARWIN9) || defined(DARWIN10) || defined(DARWIN11) || \
+    defined(DARWIN12) || defined(DARWIN13) || defined(DARWIN14)
 #else
 union semun {
   int val;
@@ -325,6 +328,8 @@ static int counter_file_write(pr_fh_t *fh, array_header *ids) {
   for (i = 0; i < ids->nelts; i++) {
     char buf[32];
 
+    pr_signals_handle();
+
     /* Skip any negative IDs.  This small hack allows for IDs to be
      * effectively removed from the list.
      */
@@ -363,19 +368,33 @@ static int counter_file_write(pr_fh_t *fh, array_header *ids) {
   return 0;
 }
 
+static char *counter_abs_path(pool *p, const char *path, int interpolate) {
+  const char *chroot_path;
+  char *abs_path;
+
+  chroot_path = session.chroot_path;
+  if (counter_chroot_path != NULL) {
+    session.chroot_path = counter_chroot_path;
+  }
+
+  abs_path = dir_abs_path(p, path, interpolate);
+  session.chroot_path = chroot_path;
+
+  return abs_path;
+}
+
 static pr_fh_t *counter_get_fh(pool *p, const char *path) {
   struct counter_fh *iter, *cfh = NULL;
   const char *abs_path;
 
   /* Find the CounterFile handle to use for the given path, if any. */
-
   if (counter_fhs == NULL) {
     errno = ENOENT;
     return NULL;
   }
 
   if (session.chroot_path) {
-    abs_path = dir_abs_path(p, path, FALSE);
+    abs_path = counter_abs_path(p, path, FALSE);
 
   } else {
     abs_path = path;
@@ -389,6 +408,7 @@ static pr_fh_t *counter_get_fh(pool *p, const char *path) {
 
   for (iter = (struct counter_fh *) counter_fhs->xas_list; iter;
      iter = iter->next) {
+    pr_signals_handle();
 
     if (!iter->isglob) {
       continue;
@@ -690,20 +710,28 @@ MODRET counter_retr(cmd_rec *cmd) {
   config_rec *c;
   int res;
   pr_fh_t *fh;
+  const char *path;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return PR_DECLINED(cmd);
+  }
 
   c = find_config(CURRENT_CONF, CONF_PARAM, "CounterMaxReaders", FALSE);
   counter_max_readers = c ? *((int *) c->argv[0]) : COUNTER_DEFAULT_MAX_READERS;
 
-  if (counter_max_readers == 0)
-    return PR_DECLINED(cmd);
- 
-  counter_curr_path = pr_table_get(cmd->notes, "mod_xfer.retr-path", NULL); 
-  if (counter_curr_path == NULL) {
+  if (counter_max_readers == 0) {
     return PR_DECLINED(cmd);
   }
+ 
+  path = pr_table_get(cmd->notes, "mod_xfer.retr-path", NULL);
+  if (path == NULL) {
+    return PR_DECLINED(cmd);
+  }
+
+  /* Note that for purposes of our semaphores, we need to use the absolute
+   * path.
+   */
+  counter_curr_path = counter_abs_path(cmd->tmp_pool, path, FALSE);
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -825,19 +853,28 @@ MODRET counter_stor(cmd_rec *cmd) {
   config_rec *c;
   int res;
   pr_fh_t *fh;
+  const char *path;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return PR_DECLINED(cmd);
+  }
 
   c = find_config(CURRENT_CONF, CONF_PARAM, "CounterMaxWriters", FALSE);
   counter_max_writers = c ? *((int *) c->argv[0]) : COUNTER_DEFAULT_MAX_WRITERS;
 
-  if (counter_max_writers == 0)
+  if (counter_max_writers == 0) {
     return PR_DECLINED(cmd);
+  }
 
-  counter_curr_path = pr_table_get(cmd->notes, "mod_xfer.store-path", NULL);
-  if (!counter_curr_path)
+  path = pr_table_get(cmd->notes, "mod_xfer.store-path", NULL);
+  if (path == NULL) {
     return PR_DECLINED(cmd);
+  }
+
+  /* Note that for purposes of our semaphores, we need to use the absolute
+   * path.
+   */
+  counter_curr_path = counter_abs_path(cmd->tmp_pool, path, FALSE);
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -991,11 +1028,16 @@ static void counter_mod_unload_ev(const void *event_data, void *user_data) {
 }
 #endif
 
+static void counter_chroot_ev(const void *event_data, void *user_data) {
+  counter_chroot_path = pstrdup(counter_pool, event_data);
+}
+
 static void counter_exit_ev(const void *event_data, void *user_data) {
   pr_fh_t *fh;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return;
+  }
 
   if (counter_curr_semid != -1 &&
       (counter_pending & COUNTER_HAVE_READER)) {
@@ -1047,15 +1089,16 @@ static int counter_sess_init(void) {
   config_rec *c;
 
   c = find_config(main_server->conf, CONF_PARAM, "CounterEngine", FALSE);
-  if (c &&
-      *((unsigned int *) c->argv[0]) == TRUE)
-    counter_engine = TRUE;
+  if (c != NULL) {
+    counter_engine = *((unsigned int *) c->argv[0]);
+  }
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return 0;
+  }
 
   c = find_config(main_server->conf, CONF_PARAM, "CounterLog", FALSE);
-  if (c) {
+  if (c != NULL) {
     const char *path = c->argv[0];
 
     if (strcasecmp(path, "none") != 0) {
@@ -1168,6 +1211,14 @@ static int counter_sess_init(void) {
   }
 
   pr_event_register(&counter_module, "core.exit", counter_exit_ev, NULL);
+
+  /* If mod_vroot is present, we need to do a little more magic to counter
+   * the mod_vroot magic.
+   */
+  if (pr_module_exists("mod_vroot.c") == TRUE) {
+    pr_event_register(&counter_module, "core.chroot", counter_chroot_ev, NULL);
+  }
+
   return 0;
 }
 
