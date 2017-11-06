@@ -117,7 +117,17 @@ my $TESTS = {
     test_class => [qw(forking mod_vroot)],
   },
 
+  counter_vroot_retr_max_readers_exceeded_in_subdir => {
+    order => ++$order,
+    test_class => [qw(forking mod_vroot)],
+  },
+
   counter_vroot_stor_max_writes_exceeded => {
+    order => ++$order,
+    test_class => [qw(forking mod_vroot)],
+  },
+
+  counter_vroot_stor_max_writes_exceeded_in_subdir => {
     order => ++$order,
     test_class => [qw(forking mod_vroot)],
   },
@@ -155,7 +165,6 @@ sub counter_retr_max_readers_exceeded {
         CounterEngine => 'on',
         CounterLog => $setup->{log_file},
         CounterFile => $counter_file,
-        CounterMaxReaders => 1,
       },
 
       'mod_delay.c' => {
@@ -166,6 +175,20 @@ sub counter_retr_max_readers_exceeded {
 
   my ($port, $config_user, $config_group) = config_write($setup->{config_file},
     $config);
+
+  if (open(my $fh, ">> $setup->{config_file}")) {
+    print $fh <<EOC;
+<Directory /test.d>
+  CounterMaxReaders 1
+</Directory>
+EOC
+    unless (close($fh)) {
+      die("Can't write $setup->{config_file}: $!");
+    }
+
+  } else {
+    die("Can't open $setup->{config_file}: $!");
+  }
 
   # Open pipes, for use between the parent and child processes.  Specifically,
   # the child will indicate when it's done with its test by writing a message
@@ -3416,6 +3439,271 @@ sub counter_vroot_retr_max_readers_exceeded {
   my $setup = test_setup($tmpdir, 'counter');
 
   my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
+
+  my $test_file = File::Spec->rel2abs("$tmpdir/test.dat");
+  if (open(my $fh, "> $test_file")) {
+    print $fh "Hello, World!\n";
+    unless (close($fh)) {
+      die("Can't write $test_file: $!");
+    }
+
+  } else {
+    die("Can't open $test_file: $!");
+  }
+
+  my $config = {
+    PidFile => $setup->{pid_file},
+    ScoreboardFile => $setup->{scoreboard_file},
+    SystemLog => $setup->{log_file},
+    TraceLog => $setup->{log_file},
+    Trace => 'counter:20 vroot:20 vroot.fsio:20',
+
+    AuthUserFile => $setup->{auth_user_file},
+    AuthGroupFile => $setup->{auth_group_file},
+    AllowOverwrite => 'on',
+    DefaultRoot => '~',
+
+    IfModules => {
+      'mod_counter.c' => {
+        CounterEngine => 'on',
+        CounterLog => $setup->{log_file},
+        CounterFile => $counter_file,
+        CounterMaxReaders => 1,
+      },
+
+      'mod_delay.c' => {
+        DelayEngine => 'off',
+      },
+
+      'mod_vroot.c' => {
+        VRootEngine => 'on',
+      },
+    },
+  };
+
+  my ($port, $config_user, $config_group) = config_write($setup->{config_file},
+    $config);
+
+  # Open pipes, for use between the parent and child processes.  Specifically,
+  # the child will indicate when it's done with its test by writing a message
+  # to the parent.
+  my ($rfh, $wfh);
+  unless (pipe($rfh, $wfh)) {
+    die("Can't open pipe: $!");
+  }
+
+  my $ex;
+
+  # Fork child
+  $self->handle_sigchld();
+  defined(my $pid = fork()) or die("Can't fork: $!");
+  if ($pid) {
+    eval {
+      my $client1 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
+      $client1->login($setup->{user}, $setup->{passwd});
+
+      my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
+      $client2->login($setup->{user}, $setup->{passwd});
+
+      my $conn = $client1->retr_raw('test.dat');
+      unless ($conn) {
+        die("Failed to RETR test.d: " . $client1->response_code() . " " .
+          $client1->response_msg());
+      }
+
+      # Now, before we close this data connection, try to open another
+      # data connection for the same file.
+      my $conn2 = $client2->retr_raw('test.dat');
+      if ($conn2) {
+        die("RETR test.dat succeeded unexpectedly");
+      }
+
+      my $resp_code = $client2->response_code();
+      my $resp_msg = $client2->response_msg();
+
+      my $expected = 450;
+      $self->assert($expected == $resp_code,
+        "Expected response code $expected, got $resp_code");
+
+      $expected = "test.dat: File busy";
+      $self->assert($expected eq $resp_msg,
+        "Expected response message '$expected', got '$resp_msg'");
+
+      my $buf;
+      $conn->read($buf, 8192, 15);
+      eval { $conn->close() };
+
+      $resp_code = $client1->response_code();
+      $resp_msg = $client1->response_msg();
+      $self->assert_transfer_ok($resp_code, $resp_msg);
+
+      $client2->quit();
+      $client1->quit();
+    };
+    if ($@) {
+      $ex = $@;
+    }
+
+    $wfh->print("done\n");
+    $wfh->flush();
+
+  } else {
+    eval { server_wait($setup->{config_file}, $rfh) };
+    if ($@) {
+      warn($@);
+      exit 1;
+    }
+
+    exit 0;
+  }
+
+  # Stop server
+  server_stop($setup->{pid_file});
+  $self->assert_child_ok($pid);
+
+  test_cleanup($setup->{log_file}, $ex);
+}
+
+sub counter_vroot_retr_max_readers_exceeded_in_subdir {
+  my $self = shift;
+  my $tmpdir = $self->{tmpdir};
+  my $setup = test_setup($tmpdir, 'counter');
+
+  my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
+
+  my $sub_dir = File::Spec->rel2abs("$tmpdir/test.d");
+  mkpath($sub_dir);
+
+  my $test_file = File::Spec->rel2abs("$sub_dir/test.dat");
+  if (open(my $fh, "> $test_file")) {
+    print $fh "Hello, World!\n";
+    unless (close($fh)) {
+      die("Can't write $test_file: $!");
+    }
+
+  } else {
+    die("Can't open $test_file: $!");
+  }
+
+  my $config = {
+    PidFile => $setup->{pid_file},
+    ScoreboardFile => $setup->{scoreboard_file},
+    SystemLog => $setup->{log_file},
+    TraceLog => $setup->{log_file},
+    Trace => 'counter:20 vroot:20 vroot.fsio:20',
+
+    AuthUserFile => $setup->{auth_user_file},
+    AuthGroupFile => $setup->{auth_group_file},
+    AllowOverwrite => 'on',
+    DefaultRoot => '~',
+
+    IfModules => {
+      'mod_counter.c' => {
+        CounterEngine => 'on',
+        CounterLog => $setup->{log_file},
+        CounterFile => $counter_file,
+        CounterMaxReaders => 1,
+      },
+
+      'mod_delay.c' => {
+        DelayEngine => 'off',
+      },
+
+      'mod_vroot.c' => {
+        VRootEngine => 'on',
+      },
+    },
+  };
+
+  my ($port, $config_user, $config_group) = config_write($setup->{config_file},
+    $config);
+
+  # Open pipes, for use between the parent and child processes.  Specifically,
+  # the child will indicate when it's done with its test by writing a message
+  # to the parent.
+  my ($rfh, $wfh);
+  unless (pipe($rfh, $wfh)) {
+    die("Can't open pipe: $!");
+  }
+
+  my $ex;
+
+  # Fork child
+  $self->handle_sigchld();
+  defined(my $pid = fork()) or die("Can't fork: $!");
+  if ($pid) {
+    eval {
+      my $client1 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
+      $client1->login($setup->{user}, $setup->{passwd});
+
+      my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
+      $client2->login($setup->{user}, $setup->{passwd});
+
+      my $conn = $client1->retr_raw('test.d/test.dat');
+      unless ($conn) {
+        die("Failed to RETR test.d/test.d: " . $client1->response_code() . " " .
+          $client1->response_msg());
+      }
+
+      # Now, before we close this data connection, try to open another
+      # data connection for the same file.
+      my $conn2 = $client2->retr_raw('test.d/test.dat');
+      if ($conn2) {
+        die("RETR test.d/test.dat succeeded unexpectedly");
+      }
+
+      my $resp_code = $client2->response_code();
+      my $resp_msg = $client2->response_msg();
+
+      my $expected = 450;
+      $self->assert($expected == $resp_code,
+        "Expected response code $expected, got $resp_code");
+
+      $expected = "test.d/test.dat: File busy";
+      $self->assert($expected eq $resp_msg,
+        "Expected response message '$expected', got '$resp_msg'");
+
+      my $buf;
+      $conn->read($buf, 8192, 15);
+      eval { $conn->close() };
+
+      $resp_code = $client1->response_code();
+      $resp_msg = $client1->response_msg();
+      $self->assert_transfer_ok($resp_code, $resp_msg);
+
+      $client2->quit();
+      $client1->quit();
+    };
+    if ($@) {
+      $ex = $@;
+    }
+
+    $wfh->print("done\n");
+    $wfh->flush();
+
+  } else {
+    eval { server_wait($setup->{config_file}, $rfh) };
+    if ($@) {
+      warn($@);
+      exit 1;
+    }
+
+    exit 0;
+  }
+
+  # Stop server
+  server_stop($setup->{pid_file});
+  $self->assert_child_ok($pid);
+
+  test_cleanup($setup->{log_file}, $ex);
+}
+
+sub counter_vroot_stor_max_writers_exceeded {
+  my $self = shift;
+  my $tmpdir = $self->{tmpdir};
+  my $setup = test_setup($tmpdir, 'counter');
+
+  my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
   my $test_file = 'test.dat';
 
   my $config = {
@@ -3474,7 +3762,7 @@ sub counter_vroot_retr_max_readers_exceeded {
 
       my $conn = $client1->stor_raw($test_file);
       unless ($conn) {
-        die("Failed to STOR $test_file: " . $client1->response_code() . " " .
+        die("Failed to STOR: " . $client1->response_code() . " " .
           $client1->response_msg());
       }
 
@@ -3496,7 +3784,7 @@ sub counter_vroot_retr_max_readers_exceeded {
       $self->assert($expected eq $resp_msg,
         "Expected response message '$expected', got '$resp_msg'");
 
-      my $buf = "Hello, World!\n";
+      my $buf = 'Hello, World!\n';
       $conn->write($buf, length($buf));
       eval { $conn->close() };
 
@@ -3531,13 +3819,17 @@ sub counter_vroot_retr_max_readers_exceeded {
   test_cleanup($setup->{log_file}, $ex);
 }
 
-sub counter_vroot_stor_max_writers_exceeded {
+sub counter_vroot_stor_max_writers_exceeded_in_subdir {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
   my $setup = test_setup($tmpdir, 'counter');
 
   my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
-  my $test_file = 'counter.conf';
+
+  my $sub_dir = File::Spec->rel2abs("$tmpdir/test.d");
+  mkpath($sub_dir);
+
+  my $test_file = 'test.d/test.dat';
 
   my $config = {
     PidFile => $setup->{pid_file},
@@ -3548,6 +3840,7 @@ sub counter_vroot_stor_max_writers_exceeded {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AllowOverwrite => 'on',
     DefaultRoot => '~',
 
     IfModules => {
@@ -3555,7 +3848,6 @@ sub counter_vroot_stor_max_writers_exceeded {
         CounterEngine => 'on',
         CounterLog => $setup->{log_file},
         CounterFile => $counter_file,
-        CounterMaxReaders => 1,
       },
 
       'mod_delay.c' => {
@@ -3570,6 +3862,20 @@ sub counter_vroot_stor_max_writers_exceeded {
 
   my ($port, $config_user, $config_group) = config_write($setup->{config_file},
     $config);
+
+  if (open(my $fh, ">> $setup->{config_file}")) {
+    print $fh <<EOC;
+<Directory /test.d/>
+  CounterMaxWriters 1
+</Directory>
+EOC
+    unless (close($fh)) {
+      die("Can't write $setup->{config_file}: $!");
+    }
+
+  } else {
+    die("Can't open $setup->{config_file}: $!");
+  }
 
   # Open pipes, for use between the parent and child processes.  Specifically,
   # the child will indicate when it's done with its test by writing a message
@@ -3592,17 +3898,17 @@ sub counter_vroot_stor_max_writers_exceeded {
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
       $client2->login($setup->{user}, $setup->{passwd});
 
-      my $conn = $client1->retr_raw($test_file);
+      my $conn = $client1->stor_raw($test_file);
       unless ($conn) {
-        die("Failed to RETR: " . $client1->response_code() . " " .
+        die("Failed to STOR: " . $client1->response_code() . " " .
           $client1->response_msg());
       }
 
       # Now, before we close this data connection, try to open another
       # data connection for the same file.
-      my $conn2 = $client2->retr_raw($test_file);
+      my $conn2 = $client2->stor_raw($test_file);
       if ($conn2) {
-        die("RETR $test_file succeeded unexpectedly");
+        die("STOR $test_file succeeded unexpectedly");
       }
 
       my $resp_code = $client2->response_code();
@@ -3616,8 +3922,8 @@ sub counter_vroot_stor_max_writers_exceeded {
       $self->assert($expected eq $resp_msg,
         "Expected response message '$expected', got '$resp_msg'");
 
-      my $buf;
-      $conn->read($buf, 8192);
+      my $buf = "Hello, World!\n";
+      $conn->write($buf, length($buf), 15);
       eval { $conn->close() };
 
       $resp_code = $client1->response_code();
