@@ -122,12 +122,12 @@ my $TESTS = {
     test_class => [qw(forking mod_vroot)],
   },
 
-  counter_vroot_stor_max_writes_exceeded => {
+  counter_vroot_stor_max_writers_exceeded => {
     order => ++$order,
     test_class => [qw(forking mod_vroot)],
   },
 
-  counter_vroot_stor_max_writes_exceeded_in_subdir => {
+  counter_vroot_stor_max_writers_exceeded_in_subdir => {
     order => ++$order,
     test_class => [qw(forking mod_vroot)],
   },
