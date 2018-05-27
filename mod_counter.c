@@ -1,6 +1,6 @@
 /*
  * ProFTPD: mod_counter -- a module for using counters to enforce per-file usage
- * Copyright (c) 2004-2017 TJ Saunders
+ * Copyright (c) 2004-2018 TJ Saunders
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
  * resulting executable, without including the source code for OpenSSL in the
  * source distribution.
  *
- * This is mod_counter, contrib software for proftpd 1.2.10rc1 and above.
+ * This is mod_counter, contrib software for proftpd 1.3.x and above.
  * For more information contact TJ Saunders <tj@castaglia.org>.
  */
 
@@ -32,7 +32,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 
-#define MOD_COUNTER_VERSION	"mod_counter/0.6.1"
+#define MOD_COUNTER_VERSION	"mod_counter/0.6.2"
 
 #if PROFTPD_VERSION_NUMBER < 0x0001030201
 # error "ProFTPD 1.3.2rc1 or later required"
@@ -74,7 +74,8 @@ static int counter_pending = 0;
 
 #if (defined(__GNU_LIBRARY__) && !defined(_SEM_SEMUN_UNDEFINED)) || \
     defined(DARWIN9) || defined(DARWIN10) || defined(DARWIN11) || \
-    defined(DARWIN12) || defined(DARWIN13) || defined(DARWIN14)
+    defined(DARWIN12) || defined(DARWIN13) || defined(DARWIN14) || \
+    defined(DARWIN15) || defined(DARWIN16) || defined(DARWIN17)
 #else
 union semun {
   int val;
@@ -133,11 +134,12 @@ static int counter_file_add_id(pr_fh_t *fh, int semid) {
   int res;
   array_header *ids;
 
-  if (counter_file_lock(fh, LOCK_EX) < 0)
+  if (counter_file_lock(fh, LOCK_EX) < 0) {
     return -1;
+  }
 
   ids = counter_file_read(fh);
-  if (!ids) {
+  if (ids == NULL) {
     int xerrno = errno;
     counter_file_lock(fh, LOCK_UN);
 
@@ -164,12 +166,14 @@ static int counter_file_lock(pr_fh_t *fh, int op) {
 #endif /* HAVE_FLOCK */
 
   if (counter_have_lock &&
-      ((op & LOCK_SH) || (op & LOCK_EX)))
+      ((op & LOCK_SH) || (op & LOCK_EX))) {
     return 0;
+  }
 
   if (!counter_have_lock &&
-      (op & LOCK_UN))
+      (op & LOCK_UN)) {
     return 0;
+  }
 
 #ifdef HAVE_FLOCK
   res = flock(fh->fh_fd, op);
@@ -204,8 +208,9 @@ static int counter_file_lock(pr_fh_t *fh, int op) {
     return -1;
   }
 
-  if (op & LOCK_NB)
+  if (op & LOCK_NB) {
     flag = F_SETLK;
+  }
 
   while (fcntl(fh->fh_fd, flag, &lock) < 0) {
     if (errno == EINTR) {
@@ -255,8 +260,9 @@ static array_header *counter_file_read(pr_fh_t *fh) {
     pr_signals_handle();
 
     id = atoi(buf);
-    if (id < 0)
+    if (id < 0) {
       continue;
+    }
 
     *((int *) push_array(ids)) = id;
   }
@@ -275,11 +281,12 @@ static int counter_file_remove_id(pr_fh_t *fh, int semid) {
   array_header *ids;
   int *semids;
 
-  if (counter_file_lock(fh, LOCK_EX) < 0)
+  if (counter_file_lock(fh, LOCK_EX) < 0) {
     return -1;
+  }
 
   ids = counter_file_read(fh);
-  if (!ids) {
+  if (ids == NULL) {
     int xerrno = errno;
 
     counter_file_lock(fh, LOCK_UN);
@@ -333,8 +340,9 @@ static int counter_file_write(pr_fh_t *fh, array_header *ids) {
     /* Skip any negative IDs.  This small hack allows for IDs to be
      * effectively removed from the list.
      */
-    if (elts[i] < 0)
+    if (elts[i] < 0) {
       continue;
+    }
 
     memset(buf, '\0', sizeof(buf));
     snprintf(buf, sizeof(buf), "%d\n", elts[i]); 
@@ -462,32 +470,46 @@ static pr_fh_t *counter_get_fh(pool *p, const char *path) {
   return NULL;
 }
 
+/* Use Perl's hashing algorithm by default.
+ *
+ * Here's a good article about this hashing algorithm, and about hashing
+ * functions in general:
+ *
+ *  http://www.perl.com/pub/2002/10/01/hashes.html
+ */
+static unsigned int key_hash(const void *key, size_t keysz) {
+  unsigned int i = 0;
+  size_t sz = !keysz ? strlen((const char *) key) : keysz;
+
+  while (sz--) {
+    const char *k = key;
+    unsigned int c;
+
+    c = k[sz];
+
+    /* Always handle signals in potentially long-running while loops. */
+    pr_signals_handle();
+
+    i = (i * 33) + c;
+  }
+
+  return i;
+}
+
 static key_t counter_get_key(const char *path) {
-  int res;
-  struct stat st;
+  size_t pathlen;
+  unsigned int h;
+  key_t key;
 
   /* ftok() uses stat(2) on the given path, which means that it needs to exist.
-   * So stat() the file ourselves first, and create it if necessary.  We need
-   * make sure that permissions on the file we create match the ones that
-   * mod_xfer would create.
+   * So we AVOID using ftok(3), and instead generate the key value ourselves.
    */
 
-  res = pr_fsio_stat(path, &st);
-  if (res < 0 &&
-      errno == ENOENT) {
-    pr_fh_t *fh;
+  pathlen = strlen(path);
+  h = key_hash(path, pathlen);
+  key = h & COUNTER_PROJ_ID;
 
-    fh = pr_fsio_open(path, O_WRONLY|O_CREAT);
-    if (fh == NULL) {
-      (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "error opening '%s': %s", path, strerror(errno));
-      return -1;
-    }
-
-    pr_fsio_close(fh);
-  }
-    
-  return ftok(path, COUNTER_PROJ_ID);
+  return key;
 }
 
 static int counter_get_sem(pr_fh_t *fh, const char *path) {
@@ -558,11 +580,13 @@ static int counter_remove_reader(pr_fh_t *fh, int semid) {
   s[1].sem_op = 1;
   s[1].sem_flg = IPC_NOWAIT|SEM_UNDO;
 
-  if (semop(semid, s, 2) < 0)
+  if (semop(semid, s, 2) < 0) {
     return -1;
+  }
 
-  if (semctl(semid, 0, IPC_RMID, s) < 0)
+  if (semctl(semid, 0, IPC_RMID, s) < 0) {
     return -1;
+  }
 
   return counter_file_remove_id(fh, semid);
 }
@@ -578,11 +602,13 @@ static int counter_remove_writer(pr_fh_t *fh, int semid) {
   s[1].sem_op = 1;
   s[1].sem_flg = IPC_NOWAIT|SEM_UNDO;
 
-  if (semop(semid, s, 2) < 0)
+  if (semop(semid, s, 2) < 0) {
     return -1;
+  }
 
-  if (semctl(semid, 0, IPC_RMID, s) < 0)
+  if (semctl(semid, 0, IPC_RMID, s) < 0) {
     return -1;
+  }
 
   return counter_file_remove_id(fh, semid);
 }
@@ -613,19 +639,20 @@ static int counter_set_writers(int semid) {
 
 /* usage: CounterEngine on|off */
 MODRET set_counterengine(cmd_rec *cmd) {
-  int bool;
+  int engine = -1;
   config_rec *c;
 
   CHECK_ARGS(cmd, 1);
   CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
 
-  bool = get_boolean(cmd, 1);
-  if (bool == -1)
+  engine = get_boolean(cmd, 1);
+  if (engine == -1) {
     CONF_ERROR(cmd, "expected Boolean parameter");
+  }
 
   c = add_config_param(cmd->argv[0], 1, NULL);
-  c->argv[0] = pcalloc(c->pool, sizeof(unsigned int));
-  *((unsigned int *) c->argv[0]) = bool;
+  c->argv[0] = pcalloc(c->pool, sizeof(int));
+  *((int *) c->argv[0]) = engine;
   
   return PR_HANDLED(cmd);
 }
@@ -731,7 +758,7 @@ MODRET counter_retr(cmd_rec *cmd) {
   /* Note that for purposes of our semaphores, we need to use the absolute
    * path.
    */
-  counter_curr_path = counter_abs_path(cmd->tmp_pool, path, FALSE);
+  counter_curr_path = counter_abs_path(cmd->pool, path, FALSE);
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -783,14 +810,16 @@ MODRET counter_alter(cmd_rec *cmd) {
   pr_fh_t *fh;
   const char *path;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return PR_DECLINED(cmd);
+  }
 
   c = find_config(CURRENT_CONF, CONF_PARAM, "CounterMaxWriters", FALSE);
   counter_max_writers = c ? *((int *) c->argv[0]) : COUNTER_DEFAULT_MAX_WRITERS;
 
-  if (counter_max_writers == 0)
+  if (counter_max_writers == 0) {
     return PR_DECLINED(cmd);
+  }
 
   path = pr_fs_decode_path(cmd->tmp_pool, cmd->arg);
 
@@ -800,7 +829,7 @@ MODRET counter_alter(cmd_rec *cmd) {
 
   /* The semaphores operate using dir_best_path(). */
   path = dir_best_path(cmd->tmp_pool, path);
-  if (!path) {
+  if (path == NULL) {
     return PR_DECLINED(cmd);
   }
 
@@ -874,7 +903,7 @@ MODRET counter_stor(cmd_rec *cmd) {
   /* Note that for purposes of our semaphores, we need to use the absolute
    * path.
    */
-  counter_curr_path = counter_abs_path(cmd->tmp_pool, path, FALSE);
+  counter_curr_path = counter_abs_path(cmd->pool, path, FALSE);
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -922,11 +951,13 @@ MODRET counter_stor(cmd_rec *cmd) {
 MODRET counter_reader_done(cmd_rec *cmd) {
   pr_fh_t *fh;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return PR_DECLINED(cmd);
+  }
 
-  if (!(counter_pending & COUNTER_HAVE_READER))
+  if (!(counter_pending & COUNTER_HAVE_READER)) {
     return PR_DECLINED(cmd);
+  }
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -969,11 +1000,13 @@ MODRET counter_reader_done(cmd_rec *cmd) {
 MODRET counter_writer_done(cmd_rec *cmd) {
   pr_fh_t *fh;
 
-  if (!counter_engine)
+  if (counter_engine == FALSE) {
     return PR_DECLINED(cmd);
+  }
 
-  if (!(counter_pending & COUNTER_HAVE_WRITER))
+  if (!(counter_pending & COUNTER_HAVE_WRITER)) {
     return PR_DECLINED(cmd);
+  }
 
   fh = counter_get_fh(cmd->tmp_pool, counter_curr_path);
   if (fh == NULL) {
@@ -1002,7 +1035,7 @@ MODRET counter_writer_done(cmd_rec *cmd) {
 
   } else {
     (void) pr_log_writefile(counter_logfd, MOD_COUNTER_VERSION,
-      "removed reader counter for '%s' (semaphore ID %d)", counter_curr_path,
+      "removed writer counter for '%s' (semaphore ID %d)", counter_curr_path,
       counter_curr_semid);
 
     counter_curr_path = NULL;
@@ -1061,8 +1094,9 @@ static void counter_exit_ev(const void *event_data, void *user_data) {
 }
 
 static void counter_restart_ev(const void *event_data, void *user_data) {
-  if (counter_pool)
+  if (counter_pool) {
     destroy_pool(counter_pool);
+  }
 
   counter_pool = make_sub_pool(permanent_pool);
   pr_pool_tag(counter_pool, MOD_COUNTER_VERSION);
@@ -1090,7 +1124,7 @@ static int counter_sess_init(void) {
 
   c = find_config(main_server->conf, CONF_PARAM, "CounterEngine", FALSE);
   if (c != NULL) {
-    counter_engine = *((unsigned int *) c->argv[0]);
+    counter_engine = *((int *) c->argv[0]);
   }
 
   if (counter_engine == FALSE) {
