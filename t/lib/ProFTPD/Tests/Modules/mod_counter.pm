@@ -27,6 +27,11 @@ my $TESTS = {
     test_class => [qw(forking)],
   },
 
+  counter_stor_max_writers_exceeded_hidden_stores_issue6 => {
+    order => ++$order,
+    test_class => [qw(forking)],
+  },
+
   counter_appe_max_writers_exceeded => {
     order => ++$order,
     test_class => [qw(forking)],
@@ -178,7 +183,7 @@ sub counter_retr_max_readers_exceeded {
 
   if (open(my $fh, ">> $setup->{config_file}")) {
     print $fh <<EOC;
-<Directory /test.d>
+<Directory />
   CounterMaxReaders 1
 </Directory>
 EOC
@@ -380,6 +385,163 @@ sub counter_stor_max_writers_exceeded {
 
         $expected = "$test_file: File busy";
         $self->assert($expected eq $resp_msg,
+          "Expected response message '$expected', got '$resp_msg'");
+      }
+
+      my $buf = "Hello, World!\n";
+      $conn->write($buf, length($buf));
+      eval { $conn->close() };
+
+      $resp_code = $client1->response_code();
+      $resp_msg = $client1->response_msg();
+      $self->assert_transfer_ok($resp_code, $resp_msg);
+
+      $client2->quit();
+      $client1->quit();
+    };
+
+    if ($@) {
+      $ex = $@;
+    }
+
+    $wfh->print("done\n");
+    $wfh->flush();
+
+  } else {
+    eval { server_wait($config_file, $rfh) };
+    if ($@) {
+      warn($@);
+      exit 1;
+    }
+
+    exit 0;
+  }
+
+  # Stop server
+  server_stop($pid_file);
+
+  $self->assert_child_ok($pid);
+
+  if ($ex) {
+    die($ex);
+  }
+
+  unlink($log_file);
+}
+
+sub counter_stor_max_writers_exceeded_hidden_stores_issue6 {
+  my $self = shift;
+  my $tmpdir = $self->{tmpdir};
+
+  my $config_file = "$tmpdir/counter.conf";
+  my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
+  my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
+
+  my $log_file = File::Spec->rel2abs('tests.log');
+
+  my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
+  my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
+
+  my $user = 'proftpd';
+  my $passwd = 'test';
+  my $home_dir = File::Spec->rel2abs($tmpdir);
+  my $uid = 500;
+  my $gid = 500;
+
+  # Make sure that, if we're running as root, that the home directory has
+  # permissions/privs set for the account we create
+  if ($< == 0) {
+    unless (chmod(0755, $home_dir)) {
+      die("Can't set perms on $home_dir to 0755: $!");
+    }
+
+    unless (chown($uid, $gid, $home_dir)) {
+      die("Can't set owner of $home_dir to $uid/$gid: $!");
+    }
+  }
+
+  auth_user_write($auth_user_file, $user, $passwd, $uid, $gid, $home_dir,
+    '/bin/bash');
+  auth_group_write($auth_group_file, 'ftpd', $gid, $user);
+
+  my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
+
+  my $test_file = 'test.txt';
+
+  my $config = {
+    PidFile => $pid_file,
+    ScoreboardFile => $scoreboard_file,
+    SystemLog => $log_file,
+    TraceLog => $log_file,
+    Trace => 'counter:20',
+
+    AuthUserFile => $auth_user_file,
+    AuthGroupFile => $auth_group_file,
+    AllowOverwrite => 'on',
+    HiddenStores => 'on',
+
+    IfModules => {
+      'mod_counter.c' => {
+        CounterEngine => 'on',
+        CounterLog => $log_file,
+        CounterFile => $counter_file,
+        CounterMaxWriters => 1,
+      },
+
+      'mod_delay.c' => {
+        DelayEngine => 'off',
+      },
+    },
+  };
+
+  my ($port, $config_user, $config_group) = config_write($config_file, $config);
+
+  # Open pipes, for use between the parent and child processes.  Specifically,
+  # the child will indicate when it's done with its test by writing a message
+  # to the parent.
+  my ($rfh, $wfh);
+  unless (pipe($rfh, $wfh)) {
+    die("Can't open pipe: $!");
+  }
+
+  my $ex;
+
+  # Fork child
+  $self->handle_sigchld();
+  defined(my $pid = fork()) or die("Can't fork: $!");
+  if ($pid) {
+    eval {
+      my $client1 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
+      $client1->login($user, $passwd);
+
+      my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
+      $client2->login($user, $passwd);
+
+      my $conn = $client1->stor_raw($test_file);
+      unless ($conn) {
+        die("Failed to STOR $test_file: " . $client1->response_code() . " " .
+          $client1->response_msg());
+      }
+
+      my ($resp_code, $resp_msg);
+      my $expected;
+
+      # Now, before we close this data connection, try to open another
+      # data connection for the same file.
+      my $conn2 = $client2->stor_raw($test_file);
+      if ($conn2) {
+        die("STOR $test_file succeeded unexpectedly");
+
+      } else {
+        $resp_code = $client2->response_code();
+        $resp_msg = $client2->response_msg();
+
+        $expected = 550;
+        $self->assert($expected == $resp_code,
+          "Expected response code $expected, got $resp_code");
+
+        $expected = "$test_file: Temporary hidden file";
+        $self->assert(qr/$expected/, $resp_msg,
           "Expected response message '$expected', got '$resp_msg'");
       }
 
@@ -3150,9 +3312,17 @@ sub counter_closest_matching_file_using_globs {
     $config);
 
   if (open(my $fh, ">> $setup->{config_file}")) {
+    my $config_sub_dir = $sub_dir;
+    my $config_subsubdir_tab = $subsubdir_tab;
+
+    if ($^O eq 'darwin') {
+      $config_sub_dir = '/private' . $config_sub_dir;
+      $config_subsubdir_tab = '/private' . $config_subsubdir_tab;
+    }
+
     print $fh <<EOC;
-<Directory $sub_dir/*/>
-  CounterFile $subsubdir_tab
+<Directory $config_sub_dir/*/>
+  CounterFile $config_subsubdir_tab
 </Directory>
 EOC
 
@@ -3321,12 +3491,25 @@ sub counter_closest_matching_file_using_globs_and_exact {
   my ($port, $config_user, $config_group) = config_write($config_file, $config);
 
   if (open(my $fh, ">> $config_file")) {
+    my $config_sub_dir = $sub_dir;
+    my $config_subdir_tab = $subdir_tab;
+
+    my $config_subsub_dir = $sub_sub_dir;
+    my $config_subsubdir_tab = $subsubdir_tab;
+
+    if ($^O eq 'darwin') {
+      $config_sub_dir = '/private' . $config_sub_dir;
+      $config_subdir_tab = '/private' . $config_subdir_tab;
+      $config_subsub_dir = '/private' . $config_subsub_dir;
+      $config_subsubdir_tab = '/private' . $config_subsubdir_tab;
+    }
+
     print $fh <<EOC;
-<Directory $sub_dir/*>
-  CounterFile $subdir_tab
+<Directory $config_sub_dir/*>
+  CounterFile $config_subdir_tab
 </Directory>
-<Directory $sub_sub_dir>
-  CounterFile $subsubdir_tab
+<Directory $config_subsub_dir>
+  CounterFile $config_subsubdir_tab
 </Directory>
 EOC
 
