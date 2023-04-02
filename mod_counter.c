@@ -345,7 +345,7 @@ static int counter_file_write(pr_fh_t *fh, array_header *ids) {
     }
 
     memset(buf, '\0', sizeof(buf));
-    snprintf(buf, sizeof(buf), "%d\n", elts[i]); 
+    snprintf(buf, sizeof(buf), "%d\n", elts[i]);
     buf[sizeof(buf)-1] = '\0';
     buf[strlen(buf)-1] = '\0';
 
@@ -528,7 +528,7 @@ static int counter_get_sem(pr_fh_t *fh, const char *path) {
    * semaphore set for this key.  If there is, try again, using a flag of
    * zero.
    */
- 
+
   semid = semget(key, COUNTER_NSEMS, IPC_CREAT|IPC_EXCL|0666);
   if (semid < 0) {
     if (errno == EEXIST) {
@@ -653,7 +653,7 @@ MODRET set_counterengine(cmd_rec *cmd) {
   c = add_config_param(cmd->argv[0], 1, NULL);
   c->argv[0] = pcalloc(c->pool, sizeof(int));
   *((int *) c->argv[0]) = engine;
-  
+
   return PR_HANDLED(cmd);
 }
 
@@ -749,7 +749,7 @@ MODRET counter_retr(cmd_rec *cmd) {
   if (counter_max_readers == 0) {
     return PR_DECLINED(cmd);
   }
- 
+
   path = pr_table_get(cmd->notes, "mod_xfer.retr-path", NULL);
   if (path == NULL) {
     return PR_DECLINED(cmd);
@@ -859,7 +859,7 @@ MODRET counter_alter(cmd_rec *cmd) {
   res = counter_add_writer(counter_curr_semid);
   if (res < 0 &&
       errno == EAGAIN) {
-  
+
     /* The lock acquisition failed, which means the file is busy.
      * The upload should be failed.
      */
@@ -929,7 +929,7 @@ MODRET counter_stor(cmd_rec *cmd) {
   res = counter_add_writer(counter_curr_semid);
   if (res < 0 &&
       errno == EAGAIN) {
-  
+
     /* The lock acquisition failed, which means the file is busy.
      * The upload should be failed.
      */

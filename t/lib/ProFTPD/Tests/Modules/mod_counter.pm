@@ -151,7 +151,7 @@ sub counter_retr_max_readers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
   my $setup = test_setup($tmpdir, 'counter');
-  
+
   my $counter_file = File::Spec->rel2abs("$tmpdir/counter.tab");
   my $test_file = 'counter.conf';
 
@@ -278,7 +278,7 @@ EOC
 sub counter_stor_max_writers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -287,7 +287,7 @@ sub counter_stor_max_writers_exceeded {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -589,7 +589,7 @@ sub counter_stor_max_writers_exceeded_hidden_stores_issue6 {
 sub counter_appe_max_writers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -598,7 +598,7 @@ sub counter_appe_max_writers_exceeded {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -744,7 +744,7 @@ sub counter_appe_max_writers_exceeded {
 sub counter_dele_max_writers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -753,7 +753,7 @@ sub counter_dele_max_writers_exceeded {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -897,7 +897,7 @@ sub counter_dele_max_writers_exceeded {
 sub counter_rnfr_max_writers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -906,7 +906,7 @@ sub counter_rnfr_max_writers_exceeded {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1050,7 +1050,7 @@ sub counter_rnfr_max_writers_exceeded {
 sub counter_rnto_max_writers_exceeded {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1059,7 +1059,7 @@ sub counter_rnto_max_writers_exceeded {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1214,7 +1214,7 @@ sub counter_rnto_max_writers_exceeded {
 sub counter_closest_matching_file_toplevel {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1223,7 +1223,7 @@ sub counter_closest_matching_file_toplevel {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1392,7 +1392,7 @@ EOC
 sub counter_closest_matching_file_toplevel_chrooted {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1401,7 +1401,7 @@ sub counter_closest_matching_file_toplevel_chrooted {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1571,7 +1571,7 @@ EOC
 sub counter_closest_matching_file_midlevel {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1580,7 +1580,7 @@ sub counter_closest_matching_file_midlevel {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1683,7 +1683,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
       $client2->cwd("foo");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -1755,7 +1755,7 @@ EOC
 sub counter_closest_matching_file_midlevel_chrooted {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1764,7 +1764,7 @@ sub counter_closest_matching_file_midlevel_chrooted {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -1868,7 +1868,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
       $client2->cwd("foo");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -1948,7 +1948,7 @@ EOC
 sub counter_closest_matching_file_bottomlevel {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -1957,7 +1957,7 @@ sub counter_closest_matching_file_bottomlevel {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -2060,7 +2060,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
       $client2->cwd("foo/bar");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -2140,7 +2140,7 @@ EOC
 sub counter_closest_matching_file_bottomlevel_chrooted {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -2149,7 +2149,7 @@ sub counter_closest_matching_file_bottomlevel_chrooted {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -2252,7 +2252,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
       $client2->cwd("foo/bar");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -2332,7 +2332,7 @@ EOC
 sub counter_closest_matching_file_none {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -2341,7 +2341,7 @@ sub counter_closest_matching_file_none {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -2434,7 +2434,7 @@ EOC
 
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -2517,7 +2517,7 @@ EOC
 sub counter_closest_matching_file_none_chrooted {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -2526,7 +2526,7 @@ sub counter_closest_matching_file_none_chrooted {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -2619,7 +2619,7 @@ EOC
 
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -2702,7 +2702,7 @@ EOC
 sub counter_closest_matching_file_using_vhost {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -2711,7 +2711,7 @@ sub counter_closest_matching_file_using_vhost {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -2889,7 +2889,7 @@ EOC
 sub counter_closest_matching_file_using_anon {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -2898,9 +2898,9 @@ sub counter_closest_matching_file_using_anon {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
- 
+
   my ($config_user, $config_group) = config_get_identity();
- 
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -3070,7 +3070,7 @@ sub counter_closest_matching_file_using_anon {
 sub counter_closest_matching_file_using_anon_subdir {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -3079,9 +3079,9 @@ sub counter_closest_matching_file_using_anon_subdir {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
- 
+
   my ($config_user, $config_group) = config_get_identity();
- 
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -3262,7 +3262,7 @@ sub counter_closest_matching_file_using_globs {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
   my $setup = test_setup($tmpdir, 'counter');
-  
+
   my $sub_dir = File::Spec->rel2abs("$tmpdir/foo");
   mkpath($sub_dir);
 
@@ -3360,7 +3360,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port, 0, 1);
       $client2->login($setup->{user}, $setup->{passwd});
       $client2->cwd("foo/bar");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
@@ -3423,7 +3423,7 @@ EOC
 sub counter_closest_matching_file_using_globs_and_exact {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
-  
+
   my $config_file = "$tmpdir/counter.conf";
   my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
   my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
@@ -3432,7 +3432,7 @@ sub counter_closest_matching_file_using_globs_and_exact {
 
   my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
   my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-  
+
   my $user = 'proftpd';
   my $passwd = 'test';
   my $home_dir = File::Spec->rel2abs($tmpdir);
@@ -3547,7 +3547,7 @@ EOC
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
       $client2->login($user, $passwd);
       $client2->cwd("foo/bar");
-   
+
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
         die("Failed to RETR: " . $client1->response_code() . " " .
