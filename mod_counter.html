@@ -164,6 +164,23 @@ your existing server:
 </pre>
 
 <p>
+<b>Logging</b><br>
+The <code>mod_counter</code> module supports different forms of logging.
+The main module logging is done via the <code>CounterLog</code> directive.  For
+debugging purposes, the module also uses <a href="http://www.proftpd.org/docs/howto/Tracing.html">trace logging</a>, via the module-specific log channels:
+<ul>
+  <li>counter
+</ul>
+Thus for trace logging, to aid in debugging, you would use the following in
+your <code>proftpd.conf</code>:
+<pre>
+  TraceLog /path/to/trace.log
+  Trace counter:20
+</pre>
+This trace logging can generate large files; it is intended for debugging
+use only, and should be removed from any production configuration.
+
+<p>
 <hr>
 <h2><a name="Usage">Usage</a></h2>
 The <code>mod_counter</code> module pays attention to the following FTP
@@ -208,7 +225,7 @@ can be downloading a given file at the same time, you would use the
 <hr><br>
 
 <font size=2><b><i>
-&copy; Copyright 2004-2017 TJ Saunders<br>
+&copy; Copyright 2004-2026 TJ Saunders<br>
  All Rights Reserved<br>
 </i></b></font>
 

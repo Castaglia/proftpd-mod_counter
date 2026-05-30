@@ -1,6 +1,6 @@
 /*
  * ProFTPD: mod_counter -- a module for using counters to enforce per-file usage
- * Copyright (c) 2004-2018 TJ Saunders
+ * Copyright (c) 2004-2026 TJ Saunders
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,8 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
+ * along with this program; see <https://www.gnu.org/licenses/>.
  *
  * As a special exemption, TJ Saunders and other respective copyright holders
  * give permission to link this program with OpenSSL, and distribute the
@@ -75,7 +74,9 @@ static int counter_pending = 0;
 #if (defined(__GNU_LIBRARY__) && !defined(_SEM_SEMUN_UNDEFINED)) || \
     defined(DARWIN9) || defined(DARWIN10) || defined(DARWIN11) || \
     defined(DARWIN12) || defined(DARWIN13) || defined(DARWIN14) || \
-    defined(DARWIN15) || defined(DARWIN16) || defined(DARWIN17)
+    defined(DARWIN15) || defined(DARWIN16) || defined(DARWIN17) || \
+    defined(DARWIN18) || defined(DARWIN19) || defined(DARWIN20) || \
+    defined(DARWIN21) || defined(DARWIN22) || defined(DARWIN23)
 #else
 union semun {
   int val;
@@ -85,7 +86,7 @@ union semun {
 };
 #endif
 
-#ifndef HAVE_FLOCK
+#if !defined(HAVE_FLOCK)
 # define LOCK_SH        1
 # define LOCK_EX        2
 # define LOCK_UN        8
@@ -158,7 +159,7 @@ static int counter_file_add_id(pr_fh_t *fh, int semid) {
 static int counter_file_lock(pr_fh_t *fh, int op) {
   static int counter_have_lock = FALSE;
 
-#ifdef HAVE_FLOCK
+#if defined(HAVE_FLOCK)
   int res;
 #else
   int flag;
@@ -175,7 +176,7 @@ static int counter_file_lock(pr_fh_t *fh, int op) {
     return 0;
   }
 
-#ifdef HAVE_FLOCK
+#if defined(HAVE_FLOCK)
   res = flock(fh->fh_fd, op);
   if (res == 0) {
     if ((op & LOCK_SH) ||

@@ -29,7 +29,7 @@ my $TESTS = {
 
   counter_stor_max_writers_exceeded_hidden_stores_issue6 => {
     order => ++$order,
-    test_class => [qw(forking)],
+    test_class => [qw(bug forking)],
   },
 
   counter_appe_max_writers_exceeded => {
@@ -164,6 +164,7 @@ sub counter_retr_max_readers_exceeded {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -321,6 +322,8 @@ sub counter_stor_max_writers_exceeded {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
 
     IfModules => {
@@ -477,6 +480,8 @@ sub counter_stor_max_writers_exceeded_hidden_stores_issue6 {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     HiddenStores => 'on',
 
@@ -632,6 +637,8 @@ sub counter_appe_max_writers_exceeded {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     AllowStoreRestart => 'on',
 
@@ -787,6 +794,8 @@ sub counter_dele_max_writers_exceeded {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     AllowStoreRestart => 'on',
 
@@ -940,6 +949,8 @@ sub counter_rnfr_max_writers_exceeded {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     AllowStoreRestart => 'on',
 
@@ -1101,6 +1112,8 @@ sub counter_rnto_max_writers_exceeded {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     AllowStoreRestart => 'on',
 
@@ -1214,62 +1227,45 @@ sub counter_rnto_max_writers_exceeded {
 sub counter_closest_matching_file_toplevel {
   my $self = shift;
   my $tmpdir = $self->{tmpdir};
+  my $setup = test_setup($tmpdir, 'counter');
 
-  my $config_file = "$tmpdir/counter.conf";
-  my $pid_file = File::Spec->rel2abs("$tmpdir/counter.pid");
-  my $scoreboard_file = File::Spec->rel2abs("$tmpdir/counter.scoreboard");
-
-  my $log_file = File::Spec->rel2abs('tests.log');
-
-  my $auth_user_file = File::Spec->rel2abs("$tmpdir/counter.passwd");
-  my $auth_group_file = File::Spec->rel2abs("$tmpdir/counter.group");
-
-  my $user = 'proftpd';
-  my $passwd = 'test';
-  my $home_dir = File::Spec->rel2abs($tmpdir);
-  my $uid = 500;
-  my $gid = 500;
-
-  my $sub_dir = File::Spec->rel2abs("$home_dir/foo");
+  my $sub_dir = File::Spec->rel2abs("$setup->{home_dir}/foo");
   mkpath($sub_dir);
 
-  my $sub_sub_dir = File::Spec->rel2abs("$home_dir/foo/bar");
+  my $sub_sub_dir = File::Spec->rel2abs("$setup->{home_dir}/foo/bar");
   mkpath($sub_sub_dir);
 
   # Make sure that, if we're running as root, that the home directory has
   # permissions/privs set for the account we create
   if ($< == 0) {
-    unless (chmod(0755, $home_dir, $sub_dir, $sub_sub_dir)) {
-      die("Can't set perms on $home_dir to 0755: $!");
+    unless (chmod(0755, $sub_dir, $sub_sub_dir)) {
+      die("Can't set perms on $sub_dir to 0755: $!");
     }
 
-    unless (chown($uid, $gid, $home_dir, $sub_dir, $sub_sub_dir)) {
-      die("Can't set owner of $home_dir to $uid/$gid: $!");
+    unless (chown($setup->{uid}, $setup->{gid}, $sub_dir, $sub_sub_dir)) {
+      die("Can't set owner of $sub_dir to $setup->{uid}/$setup->{gid}: $!");
     }
   }
 
-  auth_user_write($auth_user_file, $user, $passwd, $uid, $gid, $home_dir,
-    '/bin/bash');
-  auth_group_write($auth_group_file, 'ftpd', $gid, $user);
-
-  my $toplevel_tab = File::Spec->rel2abs("$home_dir/counter.tab");
+  my $toplevel_tab = File::Spec->rel2abs("$setup->{home_dir}/counter.tab");
   my $subdir_tab = File::Spec->rel2abs("$sub_dir/counter.tab");
   my $subsubdir_tab = File::Spec->rel2abs("$sub_sub_dir/counter.tab");
 
   my $test_file = 'counter.conf';
 
   my $config = {
-    PidFile => $pid_file,
-    ScoreboardFile => $scoreboard_file,
-    SystemLog => $log_file,
+    PidFile => $setup->{pid_file},
+    ScoreboardFile => $setup->{scoreboard_file},
+    SystemLog => $setup->{log_file},
 
-    AuthUserFile => $auth_user_file,
-    AuthGroupFile => $auth_group_file,
+    AuthUserFile => $setup->{auth_user_file},
+    AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
         CounterEngine => 'on',
-        CounterLog => $log_file,
+        CounterLog => $setup->{log_file},
         CounterMaxReaders => 1,
       },
 
@@ -1279,9 +1275,10 @@ sub counter_closest_matching_file_toplevel {
     },
   };
 
-  my ($port, $config_user, $config_group) = config_write($config_file, $config);
+  my ($port, $config_user, $config_group) = config_write($setup->{config_file},
+    $config);
 
-  if (open(my $fh, ">> $config_file")) {
+  if (open(my $fh, ">> $setup->{config_file}")) {
     print $fh <<EOC;
 CounterFile $toplevel_tab
 <Directory $sub_dir>
@@ -1293,11 +1290,11 @@ CounterFile $toplevel_tab
 EOC
 
     unless (close($fh)) {
-      die("Can't write $config_file: $!");
+      die("Can't write $setup->{config_file}: $!");
     }
 
   } else {
-    die("Can't open $config_file: $!");
+    die("Can't open $setup->{config_file}: $!");
   }
 
   # Open pipes, for use between the parent and child processes.  Specifically,
@@ -1315,11 +1312,14 @@ EOC
   defined(my $pid = fork()) or die("Can't fork: $!");
   if ($pid) {
     eval {
+      # Allow for server startup
+      sleep(1);
+
       my $client1 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
-      $client1->login($user, $passwd);
+      $client1->login($setup->{user}, $setup->{passwd});
 
       my $client2 = ProFTPD::TestSuite::FTP->new('127.0.0.1', $port);
-      $client2->login($user, $passwd);
+      $client2->login($setup->{user}, $setup->{passwd});
 
       my $conn = $client1->retr_raw($test_file);
       unless ($conn) {
@@ -1328,7 +1328,6 @@ EOC
       }
 
       my ($resp_code, $resp_msg);
-      my $expected;
 
       # Now, before we close this data connection, try to open another
       # data connection for the same file.
@@ -1340,7 +1339,7 @@ EOC
         $resp_code = $client2->response_code();
         $resp_msg = $client2->response_msg();
 
-        $expected = 450;
+        my $expected = 450;
         $self->assert($expected == $resp_code,
           "Expected response code $expected, got $resp_code");
 
@@ -1368,7 +1367,7 @@ EOC
     $wfh->flush();
 
   } else {
-    eval { server_wait($config_file, $rfh) };
+    eval { server_wait($setup->{config_file}, $rfh) };
     if ($@) {
       warn($@);
       exit 1;
@@ -1378,15 +1377,10 @@ EOC
   }
 
   # Stop server
-  server_stop($pid_file);
-
+  server_stop($setup->{pid_file});
   $self->assert_child_ok($pid);
 
-  if ($ex) {
-    die($ex);
-  }
-
-  unlink($log_file);
+  test_cleanup($setup->{log_file}, $ex);
 }
 
 sub counter_closest_matching_file_toplevel_chrooted {
@@ -1443,6 +1437,8 @@ sub counter_closest_matching_file_toplevel_chrooted {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     DefaultRoot => '~',
 
     IfModules => {
@@ -1622,6 +1618,7 @@ sub counter_closest_matching_file_midlevel {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -1806,6 +1803,8 @@ sub counter_closest_matching_file_midlevel_chrooted {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
+
     DefaultRoot => '~',
 
     IfModules => {
@@ -1999,6 +1998,7 @@ sub counter_closest_matching_file_bottomlevel {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -2191,6 +2191,7 @@ sub counter_closest_matching_file_bottomlevel_chrooted {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -2383,6 +2384,7 @@ sub counter_closest_matching_file_none {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -2568,6 +2570,7 @@ sub counter_closest_matching_file_none_chrooted {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -2754,6 +2757,7 @@ sub counter_closest_matching_file_using_vhost {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_delay.c' => {
@@ -2773,6 +2777,7 @@ sub counter_closest_matching_file_using_vhost {
   Port $port
   AuthUserFile $auth_user_file
   AuthGroupFile $auth_group_file
+  AuthOrder mod_auth_file.c
 
   CounterEngine on
   CounterLog $log_file
@@ -2942,6 +2947,7 @@ sub counter_closest_matching_file_using_anon {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     Anonymous => {
       $home_dir => {
@@ -3123,6 +3129,7 @@ sub counter_closest_matching_file_using_anon_subdir {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     Anonymous => {
       $home_dir => {
@@ -3294,6 +3301,7 @@ sub counter_closest_matching_file_using_globs {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -3474,6 +3482,7 @@ sub counter_closest_matching_file_using_globs_and_exact {
 
     AuthUserFile => $auth_user_file,
     AuthGroupFile => $auth_group_file,
+    AuthOrder => 'mod_auth_file.c',
 
     IfModules => {
       'mod_counter.c' => {
@@ -3643,6 +3652,8 @@ sub counter_vroot_retr_max_readers_exceeded {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     DefaultRoot => '~',
 
@@ -3777,6 +3788,8 @@ sub counter_vroot_retr_max_readers_exceeded_in_subdir {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     DefaultRoot => '~',
 
@@ -3898,6 +3911,8 @@ sub counter_vroot_stor_max_writers_exceeded {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     DefaultRoot => '~',
 
@@ -4023,6 +4038,8 @@ sub counter_vroot_stor_max_writers_exceeded_in_subdir {
 
     AuthUserFile => $setup->{auth_user_file},
     AuthGroupFile => $setup->{auth_group_file},
+    AuthOrder => 'mod_auth_file.c',
+
     AllowOverwrite => 'on',
     DefaultRoot => '~',
 
